@@ -2,7 +2,6 @@ package watch
 
 import (
 	"context"
-	"fmt"
 
 	client "go.etcd.io/etcd/client/v3"
 )
@@ -20,23 +19,22 @@ type Watchs struct {
 }
 
 func New_watchs(watcher client.Watcher, cache_size int) *Watchs {
-	return &Watchs{
+	nwatch := &Watchs{
 		Watcher:        watcher,
 		Cache_size:     cache_size,
-		Cache_t:        []string{},
 		Watch_chaninfo: make(chan watchchan_info, cache_size),
 	}
+	nwatch.Cache_t = make([]string, nwatch.Cache_size)
+	return nwatch
 }
 
 func add2table(key string, watch *Watchs) {
-	if len(watch.Cache_t) == watch.Cache_size {
+	if (watch.Cache_t[watch.Cache_size-1]) != "" {
 		for i := 0; i < watch.Cache_size-1; i++ {
 			watch.Cache_t[i] = watch.Cache_t[i+1]
 		}
-		watch.Cache_t = watch.Cache_t[:len(watch.Cache_t)-1]
 	}
 	watch.Cache_t = append(watch.Cache_t, key)
-	fmt.Println(watch.Cache_size)
 }
 
 func Add_watch_key(key string, watch *Watchs, ctx context.Context) {
