@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -12,17 +14,17 @@ import (
 	client "go.etcd.io/etcd/client/v3"
 )
 
-type domain_IP struct {
-	domain string
-	ip     string
+type Domain_IP struct {
+	Domain string
+	Ip     string
 }
 
 func main() {
 	//parameter set and initial
 	cache_size := 20
 	endpoint_set := []string{"127.0.0.1:32380", "127.0.0.1:12380", "127.0.0.1:22380"}
-	cache_table := make([]domain_IP, cache_size)
-	//cache_table = append(*cache_table, &domain_IP{"test","123"})
+	cache_table := make([]Domain_IP, cache_size)
+	//cache_table = append(*cache_table, &Domain_IP{"test","123"})
 	//etcd connection setting
 	ctx := context.Background()
 
@@ -45,8 +47,6 @@ func main() {
 
 	//httpserver build and run
 	go httpserver(watches, &cache_table, c, ctx)
-	watch.Add_watch_key("test", watches, ctx)
-	watch.Add_watch_key("foo", watches, ctx)
 
 	//listen for channel of watch channel
 	for {
@@ -56,7 +56,7 @@ func main() {
 				select {
 				case vall := <-val.Cn:
 					watches.Watch_chaninfo <- val
-					update_cache_table_value(domain_IP{domain: val.C_name, ip: watchResponse_process(vall)}, &cache_table)
+					update_cache_table_value(Domain_IP{Domain: val.C_name, Ip: watchResponse_process(vall)}, &cache_table)
 					fmt.Println(watchResponse_process(vall))
 				default:
 					watches.Watch_chaninfo <- val
@@ -90,57 +90,73 @@ func check_watch_table(watches watch.Watchs, key string) bool {
 	return false
 }
 
-func httpserver(watches *watch.Watchs, cache_table *[]domain_IP, cc *client.Client, ctx context.Context) {
+func httpserver(watches *watch.Watchs, cache_table *[]Domain_IP, cc *client.Client, ctx context.Context) {
 	http.HandleFunc("/", a_HandleFunc_getid("foo", *watches, cache_table, cc, ctx)) //設定存取的路由
 	http.ListenAndServe(":9090", nil)                                               //設定監聽的埠
 }
 
-func get_ip(domain_name string, watches watch.Watchs, cache_table *[]domain_IP, cc *client.Client, ctx context.Context) string {
+func get_ip(domain_name string, watches watch.Watchs, cache_table *[]Domain_IP, cc *client.Client, ctx context.Context) string {
 	cache := *cache_table
 	//search cache
 	for i := 0; i < len(cache); i++ {
-		if domain_name == cache[i].domain {
+		if domain_name == cache[i].Domain {
 			fmt.Println("found!")
-			return cache[i].ip
+			return cache[i].Ip
 		}
 	}
 	//not in cache, get from etcd
 	r, err := cc.Get(cc.Ctx(), domain_name)
 	if err != nil {
-		return "domain not found"
+		return "Domain not found"
 	}
 	res := getResponse_process(r)
-	update_cache_table(domain_IP{domain: domain_name, ip: res}, cache_table)
+	//update cache
+	update_cache_table(Domain_IP{Domain: domain_name, Ip: res}, cache_table)
+	//watch the new domainIP
 	watch.Add_watch_key(domain_name, &watches, ctx)
 	return res
 }
 
-func update_cache_table_value(di domain_IP, cache_table *[]domain_IP) {
+// update specific value where is already existed.
+func update_cache_table_value(di Domain_IP, cache_table *[]Domain_IP) {
 	cache := *cache_table
 	clen := len(cache)
 	for i := 0; i < clen; i++ {
-		if cache[i].domain == di.domain {
+		if cache[i].Domain == di.Domain {
 			cache[i] = di
 		}
 	}
+	fmt.Println(cache)
 	*cache_table = cache
 }
 
-func update_cache_table(di domain_IP, cache_table *[]domain_IP) {
+// remove the oldest Domain_IP(if full) and add new
+func update_cache_table(di Domain_IP, cache_table *[]Domain_IP) {
 	cache := *cache_table
 	clen := len(cache)
-	if (cache[clen-1] != domain_IP{}) {
+	if (cache[clen-1] != Domain_IP{}) {
 		for i := 0; i < clen-1; i++ {
 			cache[i] = cache[i+1]
 		}
+	} else {
+		for i := 0; i < clen-1; i++ {
+			if (cache[i] == Domain_IP{}) {
+				cache[i] = di
+				break
+			}
+		}
 	}
-	cache = append(cache, di)
 	*cache_table = cache
 }
 
-func a_HandleFunc_getid(domain_name string, watches watch.Watchs, cache_table *[]domain_IP, cc *client.Client, ctx context.Context) http.HandlerFunc {
+func a_HandleFunc_getid(domain_name string, watches watch.Watchs, cache_table *[]Domain_IP, cc *client.Client, ctx context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		res := get_ip(domain_name, watches, cache_table, cc, ctx)
-		fmt.Println(res)
+		var req Domain_IP
+		body, _ := ioutil.ReadAll(r.Body)
+		json.Unmarshal(body, &req)
+		res := get_ip(req.Domain, watches, cache_table, cc, ctx)
+		w.Header().Set("Content-Type", "text/plain")
+		// Write the response body
+		fmt.Fprint(w, res)
 	}
 }
