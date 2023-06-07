@@ -21,7 +21,7 @@ type Domain_IP struct {
 
 func main() {
 	//parameter set and initial
-	cache_size := 20
+	cache_size := 2
 	endpoint_set := []string{"127.0.0.1:32380", "127.0.0.1:12380", "127.0.0.1:22380"}
 	cache_table := make([]Domain_IP, cache_size)
 	//cache_table = append(*cache_table, &Domain_IP{"test","123"})
@@ -138,8 +138,10 @@ func update_cache_table(di Domain_IP, cache_table *[]Domain_IP) {
 		for i := 0; i < clen-1; i++ {
 			cache[i] = cache[i+1]
 		}
+		//edit
+		cache[clen-1] = di
 	} else {
-		for i := 0; i < clen-1; i++ {
+		for i := 0; i < clen; i++ {
 			if (cache[i] == Domain_IP{}) {
 				cache[i] = di
 				break
