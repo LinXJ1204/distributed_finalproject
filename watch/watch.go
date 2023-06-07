@@ -34,8 +34,9 @@ func add2table(key string, watch *Watchs) {
 		for i := 0; i < watch.Cache_size-1; i++ {
 			watch.Cache_t[i] = watch.Cache_t[i+1]
 		}
+		watch.Cache_t[watch.Cache_size-1] = key
 	} else {
-		for i := 0; i < watch.Cache_size-1; i++ {
+		for i := 0; i < watch.Cache_size; i++ {
 			if watch.Cache_t[i] == "" {
 				watch.Cache_t[i] = key
 				break
