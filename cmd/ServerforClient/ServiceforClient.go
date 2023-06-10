@@ -21,7 +21,7 @@ type Domain_IP struct {
 
 func main() {
 	//parameter set and initial
-	cache_size := 2
+	cache_size := 4
 	endpoint_set := []string{"127.0.0.1:32380", "127.0.0.1:12380", "127.0.0.1:22380"}
 	cache_table := make([]Domain_IP, cache_size)
 	//cache_table = append(*cache_table, &Domain_IP{"test","123"})
@@ -55,8 +55,14 @@ func main() {
 			if check_watch_table(*watches, val.C_name) {
 				select {
 				case vall := <-val.Cn:
-					watches.Watch_chaninfo <- val
-					update_cache_table_value(Domain_IP{Domain: val.C_name, Ip: watchResponse_process(vall)}, &cache_table)
+					if watchResponse_process(vall) != "" {
+						watches.Watch_chaninfo <- val
+						update_cache_table_value(Domain_IP{Domain: val.C_name, Ip: watchResponse_process(vall)}, &cache_table)
+					} else { //key expire!
+						fmt.Println("expired")
+						watch.Remove_table(val.C_name, watches)
+						remove_cache_table(Domain_IP{Domain: val.C_name, Ip: watchResponse_process(vall)}, &cache_table)
+					}
 					fmt.Println(watchResponse_process(vall))
 				default:
 					watches.Watch_chaninfo <- val
@@ -91,8 +97,8 @@ func check_watch_table(watches watch.Watchs, key string) bool {
 }
 
 func httpserver(watches *watch.Watchs, cache_table *[]Domain_IP, cc *client.Client, ctx context.Context) {
-	http.HandleFunc("/", a_HandleFunc_getid("foo", *watches, cache_table, cc, ctx)) //設定存取的路由
-	http.ListenAndServe(":9090", nil)                                               //設定監聽的埠
+	http.HandleFunc("/", a_HandleFunc_getid(*watches, cache_table, cc, ctx)) //設定存取的路由
+	http.ListenAndServe(":9090", nil)                                        //設定監聽的埠
 }
 
 func get_ip(domain_name string, watches watch.Watchs, cache_table *[]Domain_IP, cc *client.Client, ctx context.Context) string {
@@ -151,7 +157,7 @@ func update_cache_table(di Domain_IP, cache_table *[]Domain_IP) {
 	*cache_table = cache
 }
 
-func a_HandleFunc_getid(domain_name string, watches watch.Watchs, cache_table *[]Domain_IP, cc *client.Client, ctx context.Context) http.HandlerFunc {
+func a_HandleFunc_getid(watches watch.Watchs, cache_table *[]Domain_IP, cc *client.Client, ctx context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req Domain_IP
 		body, _ := ioutil.ReadAll(r.Body)
@@ -161,4 +167,24 @@ func a_HandleFunc_getid(domain_name string, watches watch.Watchs, cache_table *[
 		// Write the response body
 		fmt.Fprint(w, res)
 	}
+}
+
+func remove_cache_table(di Domain_IP, cache_table *[]Domain_IP) {
+	cache := *cache_table
+	for i := 0; i < len(cache); i++ {
+		if cache[i].Domain == di.Domain {
+			for t := i; t < len(cache); t++ {
+				if t < len(cache)-1 {
+					cache[t] = cache[t+1]
+				} else {
+					cache[t] = Domain_IP{}
+				}
+			}
+			break
+		}
+
+	}
+	*cache_table = cache
+	fmt.Println("cache_table")
+	fmt.Println(cache_table)
 }
