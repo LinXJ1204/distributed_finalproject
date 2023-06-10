@@ -59,3 +59,22 @@ func watch_key_c(key string, ctx context.Context, watcher client.Watcher, c chan
 	}
 	fmt.Println("key add")
 }
+
+func Remove_table(key string, watch *Watchs) {
+	for i := 0; i < len(watch.Cache_t); i++ {
+		if watch.Cache_t[i] == key {
+			for t := i; t < len(watch.Cache_t); t++ {
+				if t < len(watch.Cache_t)-1 {
+					watch.Cache_t[t] = watch.Cache_t[t+1]
+				} else {
+					watch.Cache_t[t] = ""
+				}
+
+			}
+			break
+		}
+
+	}
+	fmt.Println("cache_watch")
+	fmt.Println(&watch.Cache_t)
+}
