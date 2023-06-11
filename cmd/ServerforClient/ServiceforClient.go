@@ -97,8 +97,10 @@ func check_watch_table(watches watch.Watchs, key string) bool {
 }
 
 func httpserver(watches *watch.Watchs, cache_table *[]Domain_IP, cc *client.Client, ctx context.Context) {
+	addr := "172.20.10.5:50010"
+	fmt.Println("listen on:" + addr)
 	http.HandleFunc("/", a_HandleFunc_getid(*watches, cache_table, cc, ctx)) //設定存取的路由
-	http.ListenAndServe(":9090", nil)                                        //設定監聽的埠
+	http.ListenAndServe(addr, nil)                                           //設定監聽的埠
 }
 
 func get_ip(domain_name string, watches watch.Watchs, cache_table *[]Domain_IP, cc *client.Client, ctx context.Context) string {
@@ -162,10 +164,14 @@ func a_HandleFunc_getid(watches watch.Watchs, cache_table *[]Domain_IP, cc *clie
 		var req Domain_IP
 		body, _ := ioutil.ReadAll(r.Body)
 		json.Unmarshal(body, &req)
+		fmt.Println(&req)
 		res := get_ip(req.Domain, watches, cache_table, cc, ctx)
-		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		// Write the response body
-		fmt.Fprint(w, res)
+		ress := Domain_IP{Domain: req.Domain, Ip: res}
+		jsonres, _ := json.Marshal(ress)
+		w.Write(jsonres)
 	}
 }
 

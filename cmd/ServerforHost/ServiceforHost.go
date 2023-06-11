@@ -33,16 +33,18 @@ func main() {
 	defer c.Close()
 
 	http.HandleFunc("/", a_HandleFunc_s(c, ctx))
-	http.ListenAndServe(":9453", nil) //設定監聽的埠
+	http.ListenAndServe("172.20.10.5:50000", nil) //設定監聽的埠
 
 }
 
 func a_HandleFunc_s(cc *client.Client, ctx context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println(r)
 		var req Domain_IP
 		var res string
 		body, _ := ioutil.ReadAll(r.Body)
 		json.Unmarshal(body, &req)
+		fmt.Println(&req)
 		err := put_domain_ip(req, cc, ctx)
 		if err != nil {
 			res = "Error"
